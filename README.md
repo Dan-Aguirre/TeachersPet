@@ -1,2 +1,2 @@
 # Teacher'sPet
-Project fot COP4600
+Project for COP4600
