@@ -148,10 +148,7 @@ def main() -> None:
         "description": "Student in SHS! I am taking pre-calculus and advanced geometry.",
     }
 
-    # in a real application the structure could be different; here we still
-    # provide a list of (name, progress) tuples for compatibility with the
-    # original design, but only the current student ("student1") will be
-    # looked up when the toggle button is pressed.
+    # to be updated in the future with actual progress
     classes_data = {
         "Pre-Calculus": [("student1", "45")],
         "Advanced Geometry": [("student1", "78")],
