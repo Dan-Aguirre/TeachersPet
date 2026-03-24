@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request, Response
 import sqlite3, random, string
+from datetime import date, timedelta
 
 app = Flask(__name__)
 
@@ -28,17 +29,19 @@ def preflight(p=""):
 @app.route("/api/register", methods=["POST"])
 def register():
     d = request.json
+    # grab description if they sent one, default empty string
+    desc = d.get("description", "")
     try:
         con = get_db()
         con.execute(
-            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-            (d["username"], d["password"], d.get("role", "student")),
+            "INSERT INTO users (username, password, role, description) VALUES (?, ?, ?, ?)",
+            (d["username"], d["password"], d.get("role", "student"), desc),
         )
         con.commit()
-        user = con.execute(
+        usr_data = con.execute(
             "SELECT * FROM users WHERE username=?", (d["username"],)
         ).fetchone()
-        return jsonify(dict(user)), 201
+        return jsonify(dict(usr_data)), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -53,8 +56,26 @@ def login():
     ).fetchone()
     if not user:
         return jsonify({"error": "Wrong username or password"}), 401
-    con.execute("UPDATE users SET streak = streak + 1 WHERE id=?", (user["id"],))
+
+    # streak logic -- check last login date and update accordingly
+    today     = date.today().isoformat()
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    last = user["last_login"]
+    cur_streak = user["streak"]
+
+    if last == today:
+        new_streak = cur_streak  # already logged in today, dont increment
+    elif last == yesterday:
+        new_streak = cur_streak+1  # consecutive day -- keep it going
+    else:
+        new_streak = 1  # missed a day or brand new user, reset
+
+    con.execute(
+        "UPDATE users SET streak=?, last_login=? WHERE id=?",
+        (new_streak, today, user["id"])
+    )
     con.commit()
+    # re-fetch so we return the updated values
     user = con.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
     return jsonify(dict(user))
 
@@ -72,10 +93,13 @@ def get_user(uid):
 def update_user(uid):
     d = request.json
     con = get_db()
+    # update whatever fields they sent -- username password or description
     if "username" in d:
         con.execute("UPDATE users SET username=? WHERE id=?", (d["username"], uid))
     if "password" in d:
         con.execute("UPDATE users SET password=? WHERE id=?", (d["password"], uid))
+    if "description" in d:
+        con.execute("UPDATE users SET description=? WHERE id=?", (d["description"], uid))
     con.commit()
     return jsonify(
         dict(con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone())
@@ -99,6 +123,7 @@ def submit_answer():
     d = request.json
     uid = d["user_id"]
     qid = d["question_id"]
+    # try to parse answer as float -- shud always be a number
     given = float(d["answer"])
 
     con = get_db()
@@ -124,32 +149,42 @@ def submit_answer():
     con.execute("UPDATE users SET points = points + ? WHERE id=?", (pts, uid))
     con.commit()
 
-    total = con.execute("SELECT points FROM users WHERE id=?", (uid,)).fetchone()[
-        "points"
-    ]
-    return jsonify(
-        {
-            "correct_answer": correct,
-            "your_answer": given,
-            "exact": exact,
-            "points_earned": pts,
-            "total_points": total,
-        }
-    )
+    total = con.execute("SELECT points FROM users WHERE id=?", (uid,)).fetchone()["points"]
+    return jsonify({
+        "correct_answer": correct,
+        "your_answer": given,
+        "exact": exact,
+        "points_earned": pts,
+        "total_points": total,
+    })
 
 
+# returns stats for a user -- games played, total points, streak etc
 @app.route("/api/stats/<int:uid>", methods=["GET"])
 def stats(uid):
     con = get_db()
+    # session stats
     row = con.execute(
-        """
-        SELECT COUNT(*) games, SUM(points) total,
-               SUM(CASE WHEN answer = (SELECT answer FROM questions WHERE id=question_id) THEN 1 ELSE 0 END) exact_correct
-        FROM sessions WHERE user_id=?
-    """,
+        "SELECT COUNT(*) games, SUM(points) total FROM sessions WHERE user_id=?",
         (uid,),
     ).fetchone()
-    return jsonify(dict(row))
+    # also grab user info for streak and description
+    usr_data = con.execute(
+        "SELECT username, points, streak, description FROM users WHERE id=?", (uid,)
+    ).fetchone()
+    if not usr_data:
+        return jsonify({"error": "not found"}), 404
+
+    # merge the two rows into one response dict
+    res = {
+        "id": uid,
+        "username": usr_data["username"],
+        "points": usr_data["points"],
+        "games_played": row["games"] or 0,
+        "streak": usr_data["streak"],
+        "description": usr_data["description"],
+    }
+    return jsonify(res)
 
 
 @app.route("/api/rankings", methods=["GET"])
@@ -262,12 +297,10 @@ def my_classes(uid):
     """,
         (uid,),
     ).fetchall()
-    return jsonify(
-        {
-            "teaching": [dict(r) for r in teaching],
-            "enrolled": [dict(r) for r in enrolled],
-        }
-    )
+    return jsonify({
+        "teaching": [dict(r) for r in teaching],
+        "enrolled": [dict(r) for r in enrolled],
+    })
 
 
 @app.route("/api/classes/<int:class_id>/members", methods=["GET"])
