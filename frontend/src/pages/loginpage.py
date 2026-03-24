@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from studentpage import StudentPage
 from teacherpage import TeacherPage
+import api
 
 # apperance
 ctk.set_appearance_mode("light")
@@ -17,25 +18,6 @@ TEXT_LIGHT = "#7e7b91"
 ERROR_RED = "#EA2B2B"
 GREEN = "#58CC02"
 
-# mock user databse
-MOCK_USERS = {
-    "student1": {"password": "password123", "role": "student",
-                 "description": "Student in SHS! I am taking pre-calculus and advanced geometry."},
-    "teacher1": {"password": "secret", "role": "teacher",
-                 "description": "I teach algebra and geometry."},
-}
-
-# mock class data
-MOCK_CLASSES_STUDENT = {
-    "Pre-Calculus": [("student1", "45")],
-    "Advanced Geometry": [("student1", "78")],
-}
-
-MOCK_CLASSES_TEACHER = {
-    "Math": [("Alice", "80%"), ("Bob", "90%")],
-    "Science": [("Charlie", "70%"), ("Dana", "85%")],
-}
-
 
 class LoginPage(ctk.CTk):
     """Login and registration screen for Teacher's Pet.
@@ -48,13 +30,13 @@ class LoginPage(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Teacher's Pet")
-        self.geometry("480x620")
+        self.geometry("560x760")
         self.configure(fg_color=BG_COLOR)
         self.resizable(False, False)
 
         # center everthing in the window
         self.container = ctk.CTkFrame(self, fg_color=BG_COLOR)
-        self.container.place(relx=0.5, rely=0.5, anchor="center")
+        self.container.place(relx=0.5, rely=0.04, anchor="n")
 
         self._build_login_view()
 
@@ -143,12 +125,13 @@ class LoginPage(ctk.CTk):
             self.login_error.configure(text="Please fill in all fields.")
             return
 
-        user = MOCK_USERS.get(username)
-        if not user or user["password"] != password:
+        # call real backend instead of mock dict
+        usr_data = api.login(username, password)
+        if not usr_data:
             self.login_error.configure(text="Wrong username or password.")
             return
 
-        self._open_dashboard(username, user)
+        self._open_dashboard(usr_data)
 
     def _build_register_view(self):
         self._clear()
@@ -273,34 +256,23 @@ class LoginPage(ctk.CTk):
             self.reg_error.configure(text="Please fill in all fields.")
             return
 
-        if username in MOCK_USERS:
+        # register w/ backend -- returns new user dict on success
+        usr_data = api.register(username, password, role)
+        if not usr_data:
             self.reg_error.configure(text="Username already taken.")
             return
 
-        # add to mock databse
-        MOCK_USERS[username] = {
-            "password": password,
-            "role": role,
-            "description": "",
-        }
+        self._open_dashboard(usr_data)
 
-        self._open_dashboard(username, MOCK_USERS[username])
+    def _open_dashboard(self, user):
+        """close login and open the right dashboard based on role"""
+        self.withdraw()
 
-    def _open_dashboard(self, username, user_data):
-        """Close login and open the correct dashboard."""
-        self.withdraw()  # hide login window
-
-        role = user_data["role"]
-        info = {
-            "username": username,
-            "password": user_data["password"],
-            "description": user_data.get("description", ""),
-        }
-
-        if role == "teacher":
-            dashboard = TeacherPage(info, MOCK_CLASSES_TEACHER)
+        # route to right page based on role
+        if user["role"] == "teacher":
+            dashboard = TeacherPage(user)
         else:
-            dashboard = StudentPage(info, MOCK_CLASSES_STUDENT)
+            dashboard = StudentPage(user)
 
         dashboard.protocol("WM_DELETE_WINDOW",
                            lambda: self._on_dashboard_close(dashboard))

@@ -1,5 +1,6 @@
 import customtkinter as ctk
-
+import threading
+import api
 
 # set the color theme stuff
 ctk.set_appearance_mode("light")
@@ -13,30 +14,29 @@ BG_COLOR = "#f3f1fa"
 CARD_BG = "#ffffff"
 TEXT_COLOR = "#2d2b3a"
 TEXT_LIGHT = "#7e7b91"
+ORANGE = "#FF9600"
+RED = "#EA2B2B"
+GREEN = "#58CC02"
 
 
 class StudentPage(ctk.CTk):
-    """Simple Tkinter dashboard for a student profile with a sidebar tabs and main content.
+    """Dashboard for a student -- sidebar tabs and main content area.
 
-    Student sidebar will have four tabs: profile, enrolled classes, ranking, and settings. Pretty similar
-    to the teacher's page except that the profile tab will have a friends page, the classes tab will only
-    show the classes the student is enrolled in and their current progress and not the full roster,
-    and the ranking tab will show the student's ranking in each class and overall. Settings page will
-    allow student to modify their profile information and manage their friends list.
-
-    IMPORTANT: For now, the data is read-only and hardcoded, but in a real application this
-    will be dynamic and the user will be able to directly modify their profile and class
-    information.
+    tabs: profile, classes, rankings, play (quiz), settings
+    all data now comes from the flask backend via api.py -- no more hardcoded stuff
     """
 
-    def __init__(self, student_info: dict, classes_data: dict):
+    def __init__(self, user: dict):
         super().__init__()
         self.title("Teacher's Pet - Student Dashboard")
         self.geometry("900x650")
         self.configure(fg_color=BG_COLOR)
 
-        self.student_info = student_info
-        self.classes_data = classes_data
+        self.user = user
+        self.user_id = user["id"]
+
+        # current question being displayed in quiz tab
+        self.current_question = None
 
         self._build_sidebar()
 
@@ -94,6 +94,13 @@ class StudentPage(ctk.CTk):
         )
         self.rank_btn.pack(fill="x", padx=10, pady=3)
 
+        # play button -- new quiz feature
+        self.play_btn = ctk.CTkButton(
+            sidebar, text="  🎮  Play",
+            command=self.show_quiz, **btn_style
+        )
+        self.play_btn.pack(fill="x", padx=10, pady=3)
+
         self.settings_btn = ctk.CTkButton(
             sidebar, text="  ⚙️  Settings",
             command=self.show_settings, **btn_style
@@ -102,15 +109,24 @@ class StudentPage(ctk.CTk):
 
     def _set_active_btn(self, active_btn):
         """highlight the active sidebar button and reset the othres"""
-        all_btns = [self.profile_btn, self.classes_btn, self.rank_btn, self.settings_btn]
+        all_btns = [self.profile_btn, self.classes_btn, self.rank_btn,
+                    self.play_btn, self.settings_btn]
         for btn in all_btns:
             btn.configure(fg_color="transparent", text_color=TEXT_LIGHT)
-
         active_btn.configure(fg_color=PURPLE_LIGHT, text_color=PURPLE)
 
     def _clear_main(self):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
+
+    def _run_async(self, fn, callback):
+        """run a blocking api call in background thread so ui doesnt freeze"""
+        def worker():
+            result = fn()
+            self.after(0, lambda: callback(result))
+        threading.Thread(target=worker, daemon=True).start()
+
+    # -- profile tab --------------------------------------------
 
     def show_profile(self):
         self._clear_main()
@@ -121,7 +137,7 @@ class StudentPage(ctk.CTk):
         header.pack(fill="x", pady=(5,15))
 
         ctk.CTkLabel(
-            header, text=self.student_info.get("username", ""),
+            header, text=self.user.get("username", ""),
             font=ctk.CTkFont(size=28, weight="bold"),
             text_color=TEXT_COLOR
         ).pack(anchor="w")
@@ -130,7 +146,7 @@ class StudentPage(ctk.CTk):
             font=ctk.CTkFont(size=14), text_color=TEXT_LIGHT
         ).pack(anchor="w")
 
-        # stats row
+        # stats row -- start w/ loading placeholders
         stats_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         stats_frame.pack(fill="x", pady=10)
         stats_frame.columnconfigure((0,1,2), weight=1)
@@ -141,8 +157,9 @@ class StudentPage(ctk.CTk):
         ctk.CTkLabel(points_card, text="🏆", font=ctk.CTkFont(size=28)).pack(pady=(15,5))
         ctk.CTkLabel(points_card, text="Total Points", text_color=TEXT_LIGHT,
                      font=ctk.CTkFont(size=12, weight="bold")).pack()
-        ctk.CTkLabel(points_card, text="1250", text_color="#FF9600",
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0,15))
+        self.points_lbl = ctk.CTkLabel(points_card, text="...", text_color=ORANGE,
+                     font=ctk.CTkFont(size=24, weight="bold"))
+        self.points_lbl.pack(pady=(0,15))
 
         # games card
         games_card = ctk.CTkFrame(stats_frame, fg_color=CARD_BG, corner_radius=20)
@@ -150,8 +167,9 @@ class StudentPage(ctk.CTk):
         ctk.CTkLabel(games_card, text="🎯", font=ctk.CTkFont(size=28)).pack(pady=(15,5))
         ctk.CTkLabel(games_card, text="Games Played", text_color=TEXT_LIGHT,
                       font=ctk.CTkFont(size=12, weight="bold")).pack()
-        ctk.CTkLabel(games_card, text="42", text_color=PURPLE,
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0,15))
+        self.games_lbl = ctk.CTkLabel(games_card, text="...", text_color=PURPLE,
+                     font=ctk.CTkFont(size=24, weight="bold"))
+        self.games_lbl.pack(pady=(0,15))
 
         # streak card
         streak_card = ctk.CTkFrame(stats_frame, fg_color=CARD_BG, corner_radius=20)
@@ -159,8 +177,9 @@ class StudentPage(ctk.CTk):
         ctk.CTkLabel(streak_card, text="🔥", font=ctk.CTkFont(size=28)).pack(pady=(15,5))
         ctk.CTkLabel(streak_card, text="Streak", text_color=TEXT_LIGHT,
                      font=ctk.CTkFont(size=12, weight="bold")).pack()
-        ctk.CTkLabel(streak_card, text="5 Days", text_color="#EA2B2B",
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0,15))
+        self.streak_lbl = ctk.CTkLabel(streak_card, text="...", text_color=RED,
+                     font=ctk.CTkFont(size=24, weight="bold"))
+        self.streak_lbl.pack(pady=(0,15))
 
         # about me seciton
         about_card = ctk.CTkFrame(self.main_frame, fg_color=CARD_BG, corner_radius=20)
@@ -170,11 +189,31 @@ class StudentPage(ctk.CTk):
                      font=ctk.CTkFont(size=18, weight="bold"),
                      text_color=TEXT_COLOR).pack(anchor="w", padx=20, pady=(15,5))
 
-        # grab the descrption text
-        desc_txt = self.student_info.get("description", "")
-        ctk.CTkLabel(about_card, text=desc_txt,
+        self.about_lbl = ctk.CTkLabel(about_card, text="Loading...",
                      font=ctk.CTkFont(size=14), text_color=TEXT_LIGHT,
-                     wraplength=500, justify="left").pack(anchor="w", padx=20, pady=(0,15))
+                     wraplength=500, justify="left")
+        self.about_lbl.pack(anchor="w", padx=20, pady=(0,15))
+
+        # fetch real stats in background
+        self._run_async(
+            lambda: api.get_stats(self.user_id),
+            self._on_stats_loaded
+        )
+
+    def _on_stats_loaded(self, stats_data):
+        """callback -- update stat labels once api call finishes"""
+        if not stats_data:
+            self.points_lbl.configure(text="--")
+            self.games_lbl.configure(text="--")
+            self.streak_lbl.configure(text="--")
+            self.about_lbl.configure(text="Could not load stats")
+            return
+        self.points_lbl.configure(text=str(stats_data.get("points", 0)))
+        self.games_lbl.configure(text=str(stats_data.get("games_played", 0)))
+        self.streak_lbl.configure(text=f"{stats_data.get('streak', 0)} Days")
+        self.about_lbl.configure(text=stats_data.get("description", ""))
+
+    # -- classes tab --------------------------------------------
 
     def show_classes(self):
         self._clear_main()
@@ -185,9 +224,82 @@ class StudentPage(ctk.CTk):
             font=ctk.CTkFont(size=26, weight="bold"), text_color=TEXT_COLOR
         ).pack(anchor="w", pady=(5, 15))
 
-        # for each class we create a container with a header and a body that can be shown/hidden (the "dropdown").
-        for class_name, students in self.classes_data.items():
-            card = ctk.CTkFrame(self.main_frame, fg_color=CARD_BG, corner_radius=20)
+        # join class card at top
+        join_card = ctk.CTkFrame(self.main_frame, fg_color=CARD_BG, corner_radius=20)
+        join_card.pack(fill="x", pady=(0,10))
+
+        join_inner = ctk.CTkFrame(join_card, fg_color="transparent")
+        join_inner.pack(fill="x", padx=20, pady=15)
+
+        ctk.CTkLabel(join_inner, text="Join a Class",
+                     font=ctk.CTkFont(size=15, weight="bold"),
+                     text_color=TEXT_COLOR).pack(anchor="w", pady=(0,8))
+
+        join_row = ctk.CTkFrame(join_inner, fg_color="transparent")
+        join_row.pack(fill="x")
+
+        self.join_entry = ctk.CTkEntry(join_row, placeholder_text="Enter class code",
+                                       corner_radius=12, height=38,
+                                       fg_color=BG_COLOR, border_color=PURPLE_LIGHT,
+                                       border_width=2, font=ctk.CTkFont(size=13))
+        self.join_entry.pack(side="left", expand=True, fill="x", padx=(0,8))
+
+        ctk.CTkButton(join_row, text="Join", width=80,
+                      fg_color=PURPLE, hover_color=PURPLE_DARK,
+                      corner_radius=12, height=38,
+                      font=ctk.CTkFont(size=13, weight="bold"),
+                      command=self._handle_join_class).pack(side="left")
+
+        self.join_msg = ctk.CTkLabel(join_inner, text="", font=ctk.CTkFont(size=12),
+                                     text_color=TEXT_LIGHT)
+        self.join_msg.pack(anchor="w", pady=(6,0))
+
+        # container for the class list -- populated by async call
+        self.classes_container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.classes_container.pack(fill="x")
+
+        ctk.CTkLabel(self.classes_container, text="Loading...",
+                     font=ctk.CTkFont(size=14), text_color=TEXT_LIGHT).pack(pady=20)
+
+        self._run_async(
+            lambda: api.get_classes(self.user_id),
+            self._on_classes_loaded
+        )
+
+    def _handle_join_class(self):
+        code = self.join_entry.get().strip().upper()
+        if not code:
+            return
+        res = api.join_class(code, self.user_id)
+        if res:
+            self.join_msg.configure(text="Joined! Refreshing...", text_color=GREEN)
+            # refresh the class list
+            self._run_async(
+                lambda: api.get_classes(self.user_id),
+                self._on_classes_loaded
+            )
+        else:
+            self.join_msg.configure(text="Code not found or already enrolled.", text_color=RED)
+
+    def _on_classes_loaded(self, data):
+        """rebuild class cards once we get the data back"""
+        for w in self.classes_container.winfo_children():
+            w.destroy()
+
+        if not data:
+            ctk.CTkLabel(self.classes_container, text="No classes found.",
+                         font=ctk.CTkFont(size=14), text_color=TEXT_LIGHT).pack(pady=20)
+            return
+
+        # students see enrolled list
+        class_list = data.get("enrolled", [])
+        if not class_list:
+            ctk.CTkLabel(self.classes_container, text="You haven't joined any classes yet.",
+                         font=ctk.CTkFont(size=14), text_color=TEXT_LIGHT).pack(pady=20)
+            return
+
+        for cls in class_list:
+            card = ctk.CTkFrame(self.classes_container, fg_color=CARD_BG, corner_radius=20)
             card.pack(fill="x", pady=6)
 
             # class header row
@@ -195,9 +307,15 @@ class StudentPage(ctk.CTk):
             header_frame.pack(fill="x", padx=20, pady=15)
 
             ctk.CTkLabel(
-                header_frame, text=class_name,
+                header_frame, text=cls["name"],
                 font=ctk.CTkFont(size=18, weight="bold"), text_color=TEXT_COLOR
             ).pack(side="left")
+
+            # show join code next to name
+            ctk.CTkLabel(
+                header_frame, text=f"Code: {cls['code']}",
+                font=ctk.CTkFont(size=12), text_color=TEXT_LIGHT
+            ).pack(side="left", padx=(12,0))
 
             # toggle button for expanding
             toggle_btn = ctk.CTkButton(
@@ -205,7 +323,7 @@ class StudentPage(ctk.CTk):
                 fg_color=PURPLE_LIGHT, text_color=PURPLE,
                 hover_color="#ddd8f0", corner_radius=12,
                 font=ctk.CTkFont(size=12, weight="bold"),
-                command=lambda n=class_name, c=card: self._toggle_class(n, c)
+                command=lambda c=cls, card_ref=card: self._toggle_class(c["id"], card_ref)
             )
             toggle_btn.pack(side="right")
 
@@ -214,48 +332,34 @@ class StudentPage(ctk.CTk):
             card.body = body
             card.showing = False
 
-    def _toggle_class(self, class_name, card):
-        """Show or hide the current student's progress for a given class."""
+    def _toggle_class(self, class_id, card):
+        """show or hide member list for a class"""
         if card.showing:
             card.body.pack_forget()
             card.showing = False
             for w in card.body.winfo_children():
                 w.destroy()
         else:
-            # look up this student's progress within the class list
-            student_name = self.student_info.get("username", "")
-            students = self.classes_data.get(class_name, [])
-
-            progress = None
-            for name, prog in students:
-                if name == student_name:
-                    progress = prog
-                    break
-
-            if progress is None:
-                msg = "You are not enrolled in this class."
+            members = api.get_class_members(class_id)
+            if not members:
+                ctk.CTkLabel(card.body, text="No members found.",
+                             font=ctk.CTkFont(size=13), text_color=TEXT_LIGHT
+                             ).pack(anchor="w", padx=20, pady=10)
             else:
-                msg = f"Your current progress: {progress}"
-
-            ctk.CTkLabel(
-                card.body, text=msg,
-                font=ctk.CTkFont(size=14), text_color=TEXT_COLOR
-            ).pack(anchor="w", padx=20, pady=10)
-
-            # add a simple progress bar if we hav progress
-            if progress is not None:
-                try:
-                    prog_val = float(progress) / 100.0
-                except ValueError:
-                    prog_val = 0.0
-
-                pbar = ctk.CTkProgressBar(card.body, progress_color=PURPLE,
-                                          fg_color=PURPLE_LIGHT, corner_radius=10)
-                pbar.set(prog_val)
-                pbar.pack(fill="x", padx=20, pady=(0, 15))
+                for m in members:
+                    row = ctk.CTkFrame(card.body, fg_color="transparent")
+                    row.pack(fill="x", padx=20, pady=3)
+                    ctk.CTkLabel(row, text=m["username"],
+                                 font=ctk.CTkFont(size=14, weight="bold"),
+                                 text_color=TEXT_COLOR).pack(side="left")
+                    ctk.CTkLabel(row, text=f"{m['points']} pts",
+                                 font=ctk.CTkFont(size=13), text_color=ORANGE
+                                 ).pack(side="right")
 
             card.body.pack(fill="x", padx=15, pady=(0,10))
             card.showing = True
+
+    # -- rankings tab -------------------------------------------
 
     def show_rankings(self):
         self._clear_main()
@@ -266,33 +370,191 @@ class StudentPage(ctk.CTk):
             font=ctk.CTkFont(size=26, weight="bold"), text_color=TEXT_COLOR
         ).pack(anchor="w", pady=(5,15))
 
-        # hardcoded for now, will replace with api later
-        mock_rankings = [
-            ("🥇", "math_wizard_99", "4500 XP"),
-            ("🥈", "algebra_queen", "4200 XP"),
-            ("🥉", "geo_master", "3850 XP"),
-            ("  #14", "student1 (You)", "1250 XP"),
-        ]
+        # loading placeholder
+        self.rank_container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.rank_container.pack(fill="x")
+        ctk.CTkLabel(self.rank_container, text="Loading...",
+                     font=ctk.CTkFont(size=14), text_color=TEXT_LIGHT).pack(pady=20)
 
-        for medal, name, xp in mock_rankings:
-            row = ctk.CTkFrame(self.main_frame, fg_color=CARD_BG, corner_radius=16)
+        self._run_async(api.get_rankings, self._on_rankings_loaded)
+
+    def _on_rankings_loaded(self, ranking_data):
+        for w in self.rank_container.winfo_children():
+            w.destroy()
+
+        if not ranking_data:
+            ctk.CTkLabel(self.rank_container, text="Could not load rankings.",
+                         font=ctk.CTkFont(size=14), text_color=TEXT_LIGHT).pack(pady=20)
+            return
+
+        medals = ["🥇", "🥈", "🥉"]
+        for i, entry in enumerate(ranking_data):
+            row = ctk.CTkFrame(self.rank_container, fg_color=CARD_BG, corner_radius=16)
             row.pack(fill="x", pady=4)
 
-            # highlihgt current user
-            is_me = "You" in name
+            # highlihgt if this is the current user
+            is_me = entry["id"] == self.user_id
             if is_me:
                 row.configure(border_width=2, border_color=PURPLE)
 
             inner = ctk.CTkFrame(row, fg_color="transparent")
             inner.pack(fill="x", padx=15, pady=12)
 
+            medal = medals[i] if i < 3 else f"  #{i+1}"
             ctk.CTkLabel(inner, text=medal, font=ctk.CTkFont(size=20),
                         width=50).pack(side="left")
-            ctk.CTkLabel(inner, text=name,
+
+            name_txt = entry["username"] + (" (You)" if is_me else "")
+            ctk.CTkLabel(inner, text=name_txt,
                          font=ctk.CTkFont(size=16, weight="bold"),
                          text_color=PURPLE if is_me else TEXT_COLOR).pack(side="left", padx=10)
-            ctk.CTkLabel(inner, text=xp, font=ctk.CTkFont(size=14, weight="bold"),
-                        text_color="#FF9600").pack(side="right")
+            ctk.CTkLabel(inner, text=f"{entry['points']} pts",
+                        font=ctk.CTkFont(size=14, weight="bold"),
+                        text_color=ORANGE).pack(side="right")
+
+    # -- quiz tab -----------------------------------------------
+
+    def show_quiz(self):
+        self._clear_main()
+        self._set_active_btn(self.play_btn)
+
+        ctk.CTkLabel(
+            self.main_frame, text="Play",
+            font=ctk.CTkFont(size=26, weight="bold"), text_color=TEXT_COLOR
+        ).pack(anchor="w", pady=(5,15))
+
+        quiz_card = ctk.CTkFrame(self.main_frame, fg_color=CARD_BG, corner_radius=20)
+        quiz_card.pack(fill="x", pady=5)
+
+        inner = ctk.CTkFrame(quiz_card, fg_color="transparent")
+        inner.pack(fill="x", padx=25, pady=25)
+
+        # difficulty selector
+        ctk.CTkLabel(inner, text="Difficulty",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color=TEXT_COLOR).pack(anchor="w", pady=(0,8))
+
+        diff_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        diff_frame.pack(anchor="w", pady=(0,15))
+
+        self.diff_var = ctk.StringVar(value="easy")
+
+        # tried using a segmented button but it was buggy so just using 3 btns
+        # self.diff_seg = ctk.CTkSegmentedButton(inner, values=["easy","medium","hard"])
+
+        self.diff_btns = {}
+        diff_colors = {"easy": GREEN, "medium": ORANGE, "hard": RED}
+        for d in ["easy", "medium", "hard"]:
+            btn = ctk.CTkButton(diff_frame, text=d.capitalize(), width=90,
+                                corner_radius=12, height=34,
+                                font=ctk.CTkFont(size=13, weight="bold"),
+                                fg_color=diff_colors[d] if d=="easy" else "transparent",
+                                text_color="white" if d=="easy" else TEXT_LIGHT,
+                                hover_color=PURPLE_LIGHT,
+                                border_width=2, border_color=PURPLE_LIGHT,
+                                command=lambda val=d: self._select_difficulty(val))
+            btn.pack(side="left", padx=(0,6))
+            self.diff_btns[d] = btn
+
+        # new question button
+        ctk.CTkButton(inner, text="New Question",
+                      font=ctk.CTkFont(size=14, weight="bold"),
+                      fg_color=PURPLE, hover_color=PURPLE_DARK,
+                      corner_radius=16, height=40,
+                      command=self._fetch_question).pack(anchor="w", pady=(0,15))
+
+        # question display area
+        self.question_lbl = ctk.CTkLabel(inner, text="Press 'New Question' to start!",
+                                         font=ctk.CTkFont(size=16),
+                                         text_color=TEXT_COLOR,
+                                         wraplength=500, justify="left")
+        self.question_lbl.pack(anchor="w", pady=(0,15))
+
+        # answer input
+        ctk.CTkLabel(inner, text="Your Answer",
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=TEXT_LIGHT).pack(anchor="w", pady=(0,5))
+        self.answer_entry = ctk.CTkEntry(inner, placeholder_text="Type your answer here",
+                                         corner_radius=12, height=40,
+                                         fg_color=BG_COLOR, border_color=PURPLE_LIGHT,
+                                         border_width=2, font=ctk.CTkFont(size=14))
+        self.answer_entry.pack(fill="x", pady=(0,10))
+
+        ctk.CTkButton(inner, text="Submit Answer",
+                      font=ctk.CTkFont(size=14, weight="bold"),
+                      fg_color=PURPLE, hover_color=PURPLE_DARK,
+                      corner_radius=16, height=40,
+                      command=self._submit_answer).pack(anchor="w", pady=(0,12))
+
+        # result feedback label
+        self.result_lbl = ctk.CTkLabel(inner, text="",
+                                       font=ctk.CTkFont(size=15, weight="bold"),
+                                       text_color=GREEN)
+        self.result_lbl.pack(anchor="w")
+
+        # live points display
+        self.live_pts_lbl = ctk.CTkLabel(inner, text=f"Your points: {self.user.get('points', 0)}",
+                                         font=ctk.CTkFont(size=13),
+                                         text_color=TEXT_LIGHT)
+        self.live_pts_lbl.pack(anchor="w", pady=(6,0))
+
+    def _select_difficulty(self, val):
+        """highlight selected difficulty btn"""
+        self.diff_var.set(val)
+        diff_colors = {"easy": GREEN, "medium": ORANGE, "hard": RED}
+        for d, btn in self.diff_btns.items():
+            if d == val:
+                btn.configure(fg_color=diff_colors[d], text_color="white", border_width=0)
+            else:
+                btn.configure(fg_color="transparent", text_color=TEXT_LIGHT,
+                              border_width=2, border_color=PURPLE_LIGHT)
+
+    def _fetch_question(self):
+        diff = self.diff_var.get()
+        self.question_lbl.configure(text="Loading question...")
+        self.result_lbl.configure(text="")
+        self.answer_entry.delete(0, "end")
+
+        def do_fetch():
+            return api.get_question(diff)
+
+        def on_done(q_data):
+            if not q_data:
+                self.question_lbl.configure(text="Could not load question. Is the backend running?")
+                return
+            self.current_question = q_data
+            self.question_lbl.configure(text=q_data["question"])
+
+        self._run_async(do_fetch, on_done)
+
+    def _submit_answer(self):
+        if not self.current_question:
+            return
+        ans_txt = self.answer_entry.get().strip()
+        if not ans_txt:
+            return
+
+        res = api.submit_answer(self.user_id, self.current_question["id"], ans_txt)
+        if not res:
+            self.result_lbl.configure(text="Error submitting answer.", text_color=RED)
+            return
+
+        pts_earned = res.get("points_earned", 0)
+        total_pts = res.get("total_points", self.user.get("points", 0))
+        self.user["points"] = total_pts  # update local user dict
+
+        if res.get("exact"):
+            self.result_lbl.configure(text=f"Correct! +{pts_earned} points", text_color=GREEN)
+        elif pts_earned > 0:
+            self.result_lbl.configure(text=f"Close! +{pts_earned} points", text_color=ORANGE)
+        else:
+            correct_ans = res.get("correct_answer", "?")
+            self.result_lbl.configure(
+                text=f"Incorrect. Answer was {correct_ans}", text_color=RED)
+
+        self.live_pts_lbl.configure(text=f"Your points: {total_pts}")
+
+    # -- settings tab -------------------------------------------
 
     def show_settings(self):
         self._clear_main()
@@ -314,7 +576,7 @@ class StudentPage(ctk.CTk):
         desc_box = ctk.CTkTextbox(card, height=100, corner_radius=12,
                                   fg_color=BG_COLOR, text_color=TEXT_COLOR,
                                   font=ctk.CTkFont(size=13))
-        desc_box.insert("1.0", self.student_info.get("description", ""))
+        desc_box.insert("1.0", self.user.get("description", ""))
         desc_box.pack(fill="x", padx=20, pady=(0,10))
 
         # pasword field
@@ -331,32 +593,48 @@ class StudentPage(ctk.CTk):
                      font=ctk.CTkFont(size=11), text_color=TEXT_LIGHT
         ).pack(anchor="w", padx=20, pady=(0,5))
 
-        # save btn
+        # save status label
+        self.save_msg = ctk.CTkLabel(card, text="", font=ctk.CTkFont(size=12),
+                                     text_color=GREEN)
+        self.save_msg.pack(anchor="w", padx=20)
+
+        # save btn -- now actually calls backend
+        def do_save():
+            new_desc = desc_box.get("1.0", "end").strip()
+            new_pw = pw_entry.get().strip()
+            kwargs = {"description": new_desc}
+            if new_pw:
+                kwargs["password"] = new_pw
+            res = api.update_user(self.user_id, **kwargs)
+            if res:
+                self.user["description"] = new_desc
+                self.save_msg.configure(text="Saved!", text_color=GREEN)
+            else:
+                self.save_msg.configure(text="Save failed.", text_color=RED)
+
         ctk.CTkButton(
             card, text="💾  Save Changes",
               font=ctk.CTkFont(size=14, weight="bold"),
             fg_color=PURPLE, hover_color=PURPLE_DARK,
             corner_radius=20, height=42,
-            command=lambda: print("Settings saved!")
+            command=do_save
         ).pack(anchor="e", padx=20, pady=(10, 20))
 
 
 def main():
     # example data; in a real application this would come from the server or
     # login flow
-    student_info = {
+    temp_user = {
+        "id": 1,
         "username": "student1",
-        "password": "password123",
-        "description": "Student in SHS! I am taking pre-calculus and advanced geometry.",
+        "role": "student",
+        "points": 0,
+        "streak": 0,
+        "description": "",
     }
 
     # class progress data (to be updaetd w/ real api calls)
-    classes_data = {
-        "Pre-Calculus": [("student1", "45")],
-        "Advanced Geometry": [("student1", "78")],
-    }
-
-    app = StudentPage(student_info, classes_data)
+    app = StudentPage(temp_user)
     app.mainloop()
 
 
