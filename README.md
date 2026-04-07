@@ -5,7 +5,7 @@ Project for COP4600
 
 
 ## BACKEND INFO:
-To Setup DB: `python3 setup_dp.py`
+To Setup DB: `python3 setup_db.py`
 
 ### Backend API Commands:
 Register
