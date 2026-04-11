@@ -541,15 +541,10 @@ class StudentPage(ctk.CTk):
 
         pts_earned = res.get("points_earned", 0)
         total_pts = res.get("total_points", self.user.get("points", 0))
-        self.user["points"] = total_pts
+        self.user["points"] = total_pts  # update local user dict
 
         if res.get("exact"):
             self.result_lbl.configure(text=f"Correct! +{pts_earned} points", text_color=GREEN)
-            # Auto-load next question if provided
-            if "next_question" in res:
-                self.current_question = res["next_question"]
-                self.question_lbl.configure(text=res["next_question"]["question"])
-                self.answer_entry.delete(0, "end")  # clear input for next answer
         elif pts_earned > 0:
             self.result_lbl.configure(text=f"Close! +{pts_earned} points", text_color=ORANGE)
         else:
