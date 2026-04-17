@@ -266,18 +266,30 @@ class LoginPage(ctk.CTk):
 
     def _open_dashboard(self, user):
         """close login and open the right dashboard based on role"""
+        def on_logout():
+            """handle logout - destroy dashboard and show login again"""
+            dashboard.destroy()
+            self._clear_login_form()
+            self.deiconify()
+        
         self.withdraw()
 
         # route to right page based on role
         if user["role"] == "teacher":
-            dashboard = TeacherPage(user)
+            dashboard = TeacherPage(user, on_logout=on_logout)
         else:
-            dashboard = StudentPage(user)
+            dashboard = StudentPage(user, on_logout=on_logout)
 
-        dashboard.protocol("WM_DELETE_WINDOW",
-                           lambda: self._on_dashboard_close(dashboard))
+        # When dashboard is closed by X button, handle it
+        dashboard.protocol("WM_DELETE_WINDOW", lambda: self._on_dashboard_close(dashboard))
         dashboard.mainloop()
 
+    def _clear_login_form(self):
+        """clear login form fields for security"""
+        self.login_user.delete(0, "end")
+        self.login_pass.delete(0, "end")
+        self.login_error.configure(text="")
+        
     def _on_dashboard_close(self, dashboard):
         """When dashboard closes, quit the whole app."""
         dashboard.destroy()

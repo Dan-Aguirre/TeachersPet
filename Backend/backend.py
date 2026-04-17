@@ -150,13 +150,24 @@ def submit_answer():
     con.commit()
 
     total = con.execute("SELECT points FROM users WHERE id=?", (uid,)).fetchone()["points"]
-    return jsonify({
+    response = {
         "correct_answer": correct,
         "your_answer": given,
         "exact": exact,
         "points_earned": pts,
         "total_points": total,
-    })
+    }
+
+    # If answer was correct, generate a new question with same difficulty
+    if exact:
+        new_question = con.execute(
+            "SELECT id, question, difficulty FROM questions WHERE difficulty=?", (diff,)
+        ).fetchall()
+        if new_question:
+            new_q = dict(random.choice(new_question))
+            response["next_question"] = new_q
+
+    return jsonify(response)
 
 
 # returns stats for a user -- games played, total points, streak etc

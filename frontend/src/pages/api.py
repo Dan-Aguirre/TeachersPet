@@ -142,3 +142,12 @@ def create_class(teacher_id, name):
         return None
     except:
         return None
+
+
+def logout(uid):
+    # notify backend of logout (session cleanup)
+    try:
+        res = requests.post(f"{BASE}/api/logout", json={"user_id": uid})
+        return res.status_code == 200
+    except:
+        return True  # still logout locally even if backend fails

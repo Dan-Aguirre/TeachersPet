@@ -26,7 +26,7 @@ class TeacherPage(ctk.CTk):
     all data now comes from the backend via api.py -- no more hardcoded stuff
     """
 
-    def __init__(self, user: dict):
+    def __init__(self, user: dict, on_logout=None):
         super().__init__()
         self.title("Teacher's Pet - Teacher Dashboard")
         self.geometry("900x650")
@@ -34,6 +34,7 @@ class TeacherPage(ctk.CTk):
 
         self.user = user
         self.user_id = user["id"]
+        self.on_logout = on_logout 
 
         self._build_sidebar()
 
@@ -43,6 +44,16 @@ class TeacherPage(ctk.CTk):
             corner_radius=0
         )
         self.main_frame.pack(side="right", expand=True, fill="both", padx=(0,10), pady=10)
+
+        # logout button
+        logout_btn = ctk.CTkButton(
+            self.main_frame, text="🚪  Logout",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color=RED, hover_color="#c91f1f",
+            corner_radius=12, height=36
+        )
+        logout_btn.pack(anchor="w", pady=15, padx=20)
+        logout_btn.configure(command=self._handle_logout)
 
         self.show_profile()
 
@@ -191,6 +202,11 @@ class TeacherPage(ctk.CTk):
 
         self.students_count_lbl.configure(text=str(total_students))
 
+    def _handle_logout(self):
+            """handle logout - save session data and return to login"""
+            api.logout(self.user_id)
+            if self.on_logout:
+                self.on_logout()
     # -- classes tab --------------------------------------------
 
     def show_classes(self):

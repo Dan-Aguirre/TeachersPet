@@ -26,7 +26,7 @@ class StudentPage(ctk.CTk):
     all data now comes from the flask backend via api.py -- no more hardcoded stuff
     """
 
-    def __init__(self, user: dict):
+    def __init__(self, user: dict, on_logout=None):
         super().__init__()
         self.title("Teacher's Pet - Student Dashboard")
         self.geometry("900x650")
@@ -34,6 +34,7 @@ class StudentPage(ctk.CTk):
 
         self.user = user
         self.user_id = user["id"]
+        self.on_logout = on_logout  
 
         # current question being displayed in quiz tab
         self.current_question = None
@@ -194,6 +195,16 @@ class StudentPage(ctk.CTk):
                      wraplength=500, justify="left")
         self.about_lbl.pack(anchor="w", padx=20, pady=(0,15))
 
+        # logout button
+        logout_btn = ctk.CTkButton(
+            about_card, text="🚪  Logout",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color=RED, hover_color="#c91f1f",
+            corner_radius=12, height=36,
+            command=self._handle_logout
+        )
+        logout_btn.pack(anchor="e", padx=20, pady=(10, 15))
+
         # fetch real stats in background
         self._run_async(
             lambda: api.get_stats(self.user_id),
@@ -213,6 +224,11 @@ class StudentPage(ctk.CTk):
         self.streak_lbl.configure(text=f"{stats_data.get('streak', 0)} Days")
         self.about_lbl.configure(text=stats_data.get("description", ""))
 
+    def _handle_logout(self):
+        """handle logout - save session data and return to login"""
+        api.logout(self.user_id)
+        if self.on_logout:
+            self.on_logout()
     # -- classes tab --------------------------------------------
 
     def show_classes(self):
@@ -541,10 +557,15 @@ class StudentPage(ctk.CTk):
 
         pts_earned = res.get("points_earned", 0)
         total_pts = res.get("total_points", self.user.get("points", 0))
-        self.user["points"] = total_pts  # update local user dict
+        self.user["points"] = total_pts
 
         if res.get("exact"):
             self.result_lbl.configure(text=f"Correct! +{pts_earned} points", text_color=GREEN)
+            # Auto-load next question if provided
+            if "next_question" in res:
+                self.current_question = res["next_question"]
+                self.question_lbl.configure(text=res["next_question"]["question"])
+                self.answer_entry.delete(0, "end")  # clear input for next answer
         elif pts_earned > 0:
             self.result_lbl.configure(text=f"Close! +{pts_earned} points", text_color=ORANGE)
         else:
