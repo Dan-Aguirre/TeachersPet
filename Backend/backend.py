@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, Response
-import sqlite3, random, string
+import sqlite3, random, string, bcrypt
 from datetime import date, timedelta
 
 app = Flask(__name__)
@@ -33,9 +33,10 @@ def register():
     desc = d.get("description", "")
     try:
         con = get_db()
+        hashed = bcrypt.hashpw(d["password"].encode(), bcrypt.gensalt()).decode()
         con.execute(
             "INSERT INTO users (username, password, role, description) VALUES (?, ?, ?, ?)",
-            (d["username"], d["password"], d.get("role", "student"), desc),
+            (d["username"], hashed, d.get("role", "student"), desc),
         )
         con.commit()
         usr_data = con.execute(
@@ -51,10 +52,10 @@ def login():
     d = request.json
     con = get_db()
     user = con.execute(
-        "SELECT * FROM users WHERE username=? AND password=?",
-        (d["username"], d["password"]),
+        "SELECT * FROM users WHERE username=?",
+        (d["username"],),
     ).fetchone()
-    if not user:
+    if not user or not bcrypt.checkpw(d["password"].encode(), user["password"].encode()):
         return jsonify({"error": "Wrong username or password"}), 401
 
     # streak logic -- check last login date and update accordingly
@@ -97,6 +98,7 @@ def update_user(uid):
     if "username" in d:
         con.execute("UPDATE users SET username=? WHERE id=?", (d["username"], uid))
     if "password" in d:
+        hashed = bcrypt.hashpw(d["password"].encode(), bcrypt.gensalt()).decode()
         con.execute("UPDATE users SET password=? WHERE id=?", (d["password"], uid))
     if "description" in d:
         con.execute("UPDATE users SET description=? WHERE id=?", (d["description"], uid))
@@ -330,4 +332,4 @@ def class_members(class_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, host = "0.0.0.0")

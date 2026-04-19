@@ -1,4 +1,5 @@
 import sqlite3
+import bcrypt
 
 con = sqlite3.connect("game.db")
 
@@ -55,6 +56,8 @@ CREATE TABLE IF NOT EXISTS enrollments (
 
 # seed some test users if they dont exist yet
 try:
+    pw1 = bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode()
+    pw2 = bcrypt.hashpw(b"secret", bcrypt.gensalt()).decpde()
     con.execute("INSERT INTO users (username, password, role) VALUES ('student1', 'password123', 'student')")
     con.execute("INSERT INTO users (username, password, role) VALUES ('teacher1', 'secret', 'teacher')")
 except:
