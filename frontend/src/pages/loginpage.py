@@ -18,6 +18,12 @@ TEXT_LIGHT = "#7e7b91"
 ERROR_RED = "#EA2B2B"
 GREEN = "#58CC02"
 
+SPECIAL_CHARS = set(['<', '>', '"', "'", ';', '\\', '{', '}', ':', '|', '`'])
+
+#Checks if the input has any of the special characters defined above
+def invalid_check(text: str) -> bool:
+    return any(ch in SPECIAL_CHARS for ch in text)
+
 
 class LoginPage(ctk.CTk):
     """Login and registration screen for Teacher's Pet.
@@ -124,6 +130,12 @@ class LoginPage(ctk.CTk):
         if not username or not password:
             self.login_error.configure(text="Please fill in all fields.")
             return
+        
+        # check if user input a special character before sending it to backend
+        if invalid_check(username) or invalid_check(password):
+            self.login_error.configure(text="Invalid characters in username or passoword.")
+            return
+        
 
         # call real backend instead of mock dict
         usr_data = api.login(username, password)
@@ -251,6 +263,10 @@ class LoginPage(ctk.CTk):
         username = self.reg_user.get().strip()
         password = self.reg_pass.get().strip()
         role = self.role_var.get()
+
+        if invalid_check(username) or invalid_check(password):
+            self.reg_error.configure(text="Invalid characters in username or password.")
+            return
 
         if not username or not password:
             self.reg_error.configure(text="Please fill in all fields.")
