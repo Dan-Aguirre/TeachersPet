@@ -1,0 +1,12 @@
+{
+  "name": "teachers-pet",
+  "version": "1.0.0",
+  "description": "desktop app for teachers pet class project",
+  "scripts": {
+      "start": "python launcher.py",
+      "backend":  "python Backend/backend.py",
+      "dev": "python Backend/backend.py & python launcher.py"
+  },
+  "author": "1Salud",
+  "license": "ISC"
+}
