@@ -1,5 +1,5 @@
 # Teacher'sPet
-Project for COP4600
+Project for CEN3031
 
 
 ## How to run the app
