@@ -299,6 +299,11 @@ class StudentPage(ctk.CTk):
 
     def _on_classes_loaded(self, data):
         """rebuild class cards once we get the data back"""
+        # check if the widget is still there -- if user clicked away it wont be
+        # and we'll get a crash so we just stop here if its gone
+        if not self.classes_container.winfo_exists():
+          return
+
         for w in self.classes_container.winfo_children():
             w.destroy()
 
