@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "desktop app for teachers pet class project",
   "scripts": {
-      "start": "python launcher.py",
+      "start": "python run.py",
       "backend":  "python Backend/backend.py",
-      "dev": "python Backend/backend.py & python launcher.py"
+      "dev": "python run.py"
   },
   "author": "1Salud",
   "license": "ISC"
