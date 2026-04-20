@@ -149,6 +149,23 @@ def submit_answer():
         (uid, qid, given, pts),
     )
     con.execute("UPDATE users SET points = points + ? WHERE id=?", (pts, uid))
+
+    #If answer was right add 1 to answer streak, otherwise set it to zero
+    if pts > 0:
+        con.execute("UPDATE users SET answer_streak = answer_streak + 1 WHERE id=?",(uid,))
+    else:
+        con.execute("UPDATE users SET answer_streak = 0 WHERE id=?", (uid,))
+
+    #Check if user unlocked a badge
+    user = con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    new_streak = user["answer_streak"]
+
+    #Kind of repetitive as it checks for every badge everytime (could start from latest badge), but
+    #this is the easier way to do it and it works fine as we don't have many to check
+    for badge in [5, 10, 20, 50, 75, 100, 150, 200]:
+        if new_streak >=t:
+            con.execute(f"UPDATE users SET badge_{badge} = 1 WHERE id=?", (uid,))
+
     con.commit()
 
     total = con.execute("SELECT points FROM users WHERE id=?", (uid,)).fetchone()["points"]
@@ -169,7 +186,28 @@ def submit_answer():
             new_q = dict(random.choice(new_question))
             response["next_question"] = new_q
 
+    response["answer_streak"] = user["answer_streak"]
+
     return jsonify(response)
+
+# returns stats for streaks and badges
+@app.route("/api/badges/<int:uid>", methods=["GET"])
+def get_badges(uid):
+    con = get_db()
+    user = con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not user:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({
+        "answer_streak": user["answer_streak"],
+        "badge_5":   user["badge_5"],
+        "badge_10":  user["badge_10"],
+        "badge_20":  user["badge_20"],
+        "badge_50":  user["badge_50"],
+        "badge_75":  user["badge_75"],
+        "badge_100": user["badge_100"],
+        "badge_150": user["badge_150"],
+        "badge_200": user["badge_200"],
+    })
 
 
 # returns stats for a user -- games played, total points, streak etc

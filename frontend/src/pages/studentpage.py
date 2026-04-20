@@ -102,6 +102,12 @@ class StudentPage(ctk.CTk):
         )
         self.play_btn.pack(fill="x", padx=10, pady=3)
 
+        self.streaks_btn = ctk.CTkButton(
+            sidebar, text="  🏅  Streaks",
+            command = self.show_streaks, **btn_style
+        )
+        self.streaks_btn.pack(fill="x", padx=10, pady=3)
+
         self.settings_btn = ctk.CTkButton(
             sidebar, text="  ⚙️  Settings",
             command=self.show_settings, **btn_style
@@ -111,7 +117,7 @@ class StudentPage(ctk.CTk):
     def _set_active_btn(self, active_btn):
         """highlight the active sidebar button and reset the othres"""
         all_btns = [self.profile_btn, self.classes_btn, self.rank_btn,
-                    self.play_btn, self.settings_btn]
+                    self.play_btn, self.streaks_btn, self.settings_btn]
         for btn in all_btns:
             btn.configure(fg_color="transparent", text_color=TEXT_LIGHT)
         active_btn.configure(fg_color=PURPLE_LIGHT, text_color=PURPLE)
@@ -574,6 +580,73 @@ class StudentPage(ctk.CTk):
                 text=f"Incorrect. Answer was {correct_ans}", text_color=RED)
 
         self.live_pts_lbl.configure(text=f"Your points: {total_pts}")
+
+
+    def show_streaks(self):
+        self._clear_main()
+        self._set_active_btn(self.streaks_btn)
+
+        ctk.CTkLabel(
+            self.main_frame, text="Streak Badges",
+            font=ctk.CTkFont(size=26, weight="bold"), text_color=TEXT_COLOR
+        ).pack(anchor="w", pady=(5, 5))
+
+        ctk.CTkLabel(
+            self.main_frame, text="Earn badges by answering questions correctly in a row!",
+            font=ctk.CTkFont(size=13), text_color=TEXT_LIGHT
+        ).pack(anchor="w", pady=(0, 15))
+
+        # fetch badge data from backend
+        data = api.get_badges(self.user_id)
+        if not data:
+            ctk.CTkLabel(self.main_frame, text="Could not load badges.",
+                        text_color=RED).pack()
+            return
+
+        answer_streak = data.get("answer_streak", 0)
+
+        # show current streak
+        streak_card = ctk.CTkFrame(self.main_frame, fg_color=CARD_BG, corner_radius=20)
+        streak_card.pack(fill="x", pady=(0, 15))
+        ctk.CTkLabel(streak_card, text=f"🔥 Current Answer Streak: {answer_streak}",
+                    font=ctk.CTkFont(size=16, weight="bold"),
+                    text_color=ORANGE).pack(padx=20, pady=15)
+
+        # badge definitions
+        badges = [
+            (5,   "🥉", "5 in a Row"),
+            (10,  "🥈", "10 in a Row"),
+            (20,  "🥇", "20 in a Row"),
+            (50,  "🌟", "50 in a Row"),
+            (75,  "💫", "75 in a Row"),
+            (100, "🏆", "100 in a Row"),
+            (150, "👑", "150 in a Row"),
+            (200, "🔥", "200 in a Row"),
+        ]
+
+        # badge grid -- 4 columns
+        grid = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        grid.pack(fill="x")
+        for i in range(4):
+            grid.columnconfigure(i, weight=1)
+
+        for idx, (threshold, emoji, label) in enumerate(badges):
+            unlocked = data.get(f"badge_{threshold}", 0) == 1
+            card = ctk.CTkFrame(grid,
+                                fg_color=CARD_BG if unlocked else BG_COLOR,
+                                corner_radius=20,
+                                border_width=2,
+                                border_color=PURPLE if unlocked else PURPLE_LIGHT)
+            card.grid(row=idx//4, column=idx%4, padx=8, pady=8, sticky="nsew")
+
+            ctk.CTkLabel(card, text=emoji if unlocked else "🔒",
+                        font=ctk.CTkFont(size=32)).pack(pady=(15, 5))
+            ctk.CTkLabel(card, text=label,
+                        font=ctk.CTkFont(size=12, weight="bold"),
+                        text_color=TEXT_COLOR if unlocked else TEXT_LIGHT).pack()
+            ctk.CTkLabel(card, text="Unlocked!" if unlocked else f"Reach {threshold}",
+                        font=ctk.CTkFont(size=11),
+                        text_color=GREEN if unlocked else TEXT_LIGHT).pack(pady=(2, 15))
 
     # -- settings tab -------------------------------------------
 
