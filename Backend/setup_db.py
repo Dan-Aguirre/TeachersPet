@@ -13,7 +13,16 @@ CREATE TABLE IF NOT EXISTS users (
 	points   INTEGER NOT NULL DEFAULT 0,
 	streak   INTEGER NOT NULL DEFAULT 0,
     description TEXT NOT NULL DEFAULT '',
-    last_login  TEXT NOT NULL DEFAULT ''
+    last_login  TEXT NOT NULL DEFAULT '',
+    answer_streak INTEGER NOT NULL DEFAULT 0,
+    badge_5       INTEGER NOT NULL DEFAULT 0,
+    badge_10      INTEGER NOT NULL DEFAULT 0,
+    badge_20      INTEGER NOT NULL DEFAULT 0,
+    badge_50      INTEGER NOT NULL DEFAULT 0,
+    badge_75      INTEGER NOT NULL DEFAULT 0,
+    badge_100     INTEGER NOT NULL DEFAULT 0,
+    badge_150     INTEGER NOT NULL DEFAULT 0,
+    badge_200     INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS questions (
@@ -57,7 +66,7 @@ CREATE TABLE IF NOT EXISTS enrollments (
 # seed some test users if they dont exist yet
 try:
     pw1 = bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode()
-    pw2 = bcrypt.hashpw(b"secret", bcrypt.gensalt()).decpde()
+    pw2 = bcrypt.hashpw(b"secret", bcrypt.gensalt()).decode()
     con.execute("INSERT INTO users (username, password, role) VALUES ('student1', 'password123', 'student')")
     con.execute("INSERT INTO users (username, password, role) VALUES ('teacher1', 'secret', 'teacher')")
 except:

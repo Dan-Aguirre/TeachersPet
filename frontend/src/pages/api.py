@@ -151,3 +151,15 @@ def logout(uid):
         return res.status_code == 200
     except:
         return True  # still logout locally even if backend fails
+    
+def get_badges(uid):
+    # get information about which badges student has
+    try:
+        res = requests.get(f"{BASE}/api/badges/{uid}")
+        if res.status_code == 200:
+            return res.json()
+        return None
+    except:
+        None
+
+        
