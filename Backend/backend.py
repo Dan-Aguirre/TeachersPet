@@ -163,7 +163,7 @@ def submit_answer():
     #Kind of repetitive as it checks for every badge everytime (could start from latest badge), but
     #this is the easier way to do it and it works fine as we don't have many to check
     for badge in [5, 10, 20, 50, 75, 100, 150, 200]:
-        if new_streak >=t:
+        if new_streak >=badge:
             con.execute(f"UPDATE users SET badge_{badge} = 1 WHERE id=?", (uid,))
 
     con.commit()
