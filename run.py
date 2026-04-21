@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 
+# used gemini AI to clean/beutify code (renaming my horrible vars)
 def check_and_install_deps():
     try:
         import flask
