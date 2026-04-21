@@ -173,6 +173,16 @@ class TeacherPage(ctk.CTk):
                      font=ctk.CTkFont(size=24, weight="bold"))
         self.students_count_lbl.pack(pady=(0,15))
 
+        # logout button
+        logout_btn = ctk.CTkButton(
+            self.main_frame, text="🚪  Logout",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color=RED, hover_color="#c91f1f",
+            corner_radius=12, height=36,
+            command=self._handle_logout
+        )
+        logout_btn.pack(anchor="w", pady=15, padx=20)
+
         # fetch classes and count students for each
         self._run_async(
             lambda: api.get_classes(self.user_id),
@@ -203,10 +213,11 @@ class TeacherPage(ctk.CTk):
         self.students_count_lbl.configure(text=str(total_students))
 
     def _handle_logout(self):
-            """handle logout - save session data and return to login"""
-            api.logout(self.user_id)
-            if self.on_logout:
-                self.on_logout()
+        """handle logout - save session data and return to login"""
+        api.logout(self.user_id)
+        # Defer logout to allow button animation to complete
+        self.after(100, lambda: self.on_logout() if self.on_logout else None)
+
     # -- classes tab --------------------------------------------
 
     def show_classes(self):
