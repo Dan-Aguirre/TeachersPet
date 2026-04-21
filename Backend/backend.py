@@ -242,7 +242,7 @@ def stats(uid):
 def rankings():
     con = get_db()
     rows = con.execute(
-        "SELECT id, username, role, points FROM users ORDER BY points DESC LIMIT 50"
+        "SELECT id, username, role, points FROM users WHERE role='student' ORDER BY points DESC LIMIT 50"
     ).fetchall()
     return jsonify([dict(r) for r in rows])
 
