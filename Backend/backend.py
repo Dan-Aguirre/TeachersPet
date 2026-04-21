@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 app = Flask(__name__)
 
-
+# Refrence: used AI in order to create the SQlite boilerplate framework to build off of
 def get_db():
     con = sqlite3.connect("game.db", check_same_thread=False, timeout=10)
     con.row_factory = sqlite3.Row
