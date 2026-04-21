@@ -99,7 +99,7 @@ def update_user(uid):
         con.execute("UPDATE users SET username=? WHERE id=?", (d["username"], uid))
     if "password" in d:
         hashed = bcrypt.hashpw(d["password"].encode(), bcrypt.gensalt()).decode()
-        con.execute("UPDATE users SET password=? WHERE id=?", (d["password"], uid))
+        con.execute("UPDATE users SET password=? WHERE id=?", (hashed, uid))
     if "description" in d:
         con.execute("UPDATE users SET description=? WHERE id=?", (d["description"], uid))
     con.commit()
