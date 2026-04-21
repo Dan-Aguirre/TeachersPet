@@ -8,6 +8,7 @@ DATASETS = {
     "hard": "https://raw.githubusercontent.com/RamonKaspar/MathDataset-ElementarySchool/main/data/III_Geometry/geometry_100.json"
 }
 
+# Used Gemini AI to clean and beautify code
 def fetch_and_import():
     con = sqlite3.connect("game.db")
     
