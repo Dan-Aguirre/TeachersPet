@@ -233,8 +233,9 @@ class StudentPage(ctk.CTk):
     def _handle_logout(self):
         """handle logout - save session data and return to login"""
         api.logout(self.user_id)
-        if self.on_logout:
-            self.on_logout()
+        # Defer logout to allow button animation to complete
+        self.after(100, lambda: self.on_logout() if self.on_logout else None)
+
     # -- classes tab --------------------------------------------
 
     def show_classes(self):
