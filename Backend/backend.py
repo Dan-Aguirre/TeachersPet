@@ -368,6 +368,11 @@ def class_members(class_id):
     ).fetchall()
     return jsonify([dict(r) for r in rows])
 
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    # You can add session cleanup logic here later if needed
+    return jsonify({"message": "logged out successfully"}), 200
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000, host = "0.0.0.0")
