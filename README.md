@@ -4,12 +4,32 @@ Project for CEN3031
 
 ## How to run the app
 
-### Option 1 - Python (recomended)
+### Option 1 - run.py (easiest way)
+does everything automaticly - installs deps, sets up db, starts backend and app
+
+0.1 (ON LINUX) Setup Environment
+```
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+1. execute run.py
+```
+python3 run.py
+```
+
+### Option 2 - Manual Python
 make sure you have python installed first
+
+0.1 (ON LINUX) Setup Environment
+```
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
 1. install dependancies
 ```
-pip install customtkinter requests flask flask-cors
+pip install customtkinter requests flask flask-cors bcrypt
 ```
 
 2. start the backend (open a terminal and run this)
@@ -19,14 +39,7 @@ python Backend/backend.py
 
 3. open another terminal and start the desktop app
 ```
-python launcher.py
-```
-
-### Option 2 - run.py (easiest way)
-does everything automaticly - installs deps, sets up db, starts backend and app
-
-```
-python run.py
+python frontend/src/pages/loginpage.py
 ```
 
 ### Option 3 - npm
