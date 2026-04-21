@@ -285,7 +285,7 @@ class LoginPage(ctk.CTk):
         def on_logout():
             """handle logout - destroy dashboard and show login again"""
             dashboard.destroy()
-            self._clear_login_form()
+            self._build_login_view()
             self.deiconify()
         
         self.withdraw()
